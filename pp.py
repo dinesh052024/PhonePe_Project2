@@ -88,6 +88,13 @@ with col1:
   fig.update_geos(fitbounds='locations', visible=False)
   fig.update_layout(margin={"r":0,"t":0,"l":0,"b":0})
   st.plotly_chart(fig, use_container_width=True)
+  st.write('State Level User Data')
+  map_user_stsql = 'SELECT USER_STATE,SUM(USER_CNT) FROM DINESH.MAP_USER_DATA GROUP BY USER_STATE ORDER BY 2 DESC'
+  mycursor.execute(map_user_stsql)
+  df_map_user_st = pd.DataFrame(mycursor.fetchall())
+  #st.write(df_map_user_st)
+  fig_st = px.pie(df_map_user_st, values=1, names=0, title='State Level User Data')
+  st.plotly_chart(fig_st, use_container_width=True)
 
 
 
