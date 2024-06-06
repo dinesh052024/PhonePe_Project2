@@ -4,6 +4,7 @@ import plotly.express as px
 import mysql.connector
 from mysql.connector import Error
 from mysql.connector import errorcode
+import humanize
 
 #connecting to DB
 mydb = mysql.connector.connect(
@@ -26,41 +27,11 @@ mycursor.execute(dropdown2_sql)
 dd2 = pd.DataFrame(mycursor.fetchall())
 dd2_list=dd2.values.tolist()
 st.set_page_config(layout="wide")
+st.title("PhonePe Data Exploring")
 col1, col2= st.columns(2)
 #side_1, side_2 = st.beta_columns(2)
 #button_ED=st.button("Explore Data")
 #sepperating the page into 2 columns
-with col2:
-  #clicking on explore button following details will be shown
-  if st.button("Explore Data"):
-    total_tran='SELECT SUM(TRANS_AMT),AVG(TRANS_AMT) FROM DINESH.ARR_TRANS_DATA'
-    mycursor.execute(total_tran)
-    total_ret= mycursor.fetchall()  
-    cat_tran='SELECT TRANS_TYPE,SUM(TRANS_AMT) FROM DINESH.ARR_TRANS_DATA GROUP BY TRANS_TYPE ORDER BY 2 DESC'
-    mycursor.execute(cat_tran)
-    total_cat_ret= pd.DataFrame(mycursor.fetchall())
-    st.write('Total Transactions :',total_ret[0][0] ,'and Average Transaction :',total_ret[0][1])
-    total_cat_ret['Transaction Type'] = total_cat_ret[0]
-    total_cat_ret['Transaction Amount'] = total_cat_ret[1]
-    #total_cat_ret=
-    st.write('Categories:',total_cat_ret[['Transaction Type','Transaction Amount']] )
-    top_10_state='SELECT TRANS_STATE,SUM(TRANS_AMT) FROM DINESH.TOP_TRANS_DATA GROUP BY TRANS_STATE ORDER BY 2 DESC LIMIT 10;'
-    mycursor.execute(top_10_state)
-    total_10st_ret= pd.DataFrame(mycursor.fetchall())
-    total_10st_ret['Transaction State'] = total_10st_ret[0]
-    total_10st_ret['Transaction Amount'] = total_10st_ret[1]
-    top_10_pin='SELECT TRANS_PIN,SUM(TRANS_AMT) FROM DINESH.TOP_TRANS_DATA GROUP BY TRANS_PIN ORDER BY 2 DESC LIMIT 10'
-    mycursor.execute(top_10_pin)
-    total_10pin_ret= pd.DataFrame(mycursor.fetchall())
-    total_10pin_ret['Transaction Pincode'] = total_10pin_ret[0]
-    total_10pin_ret['Transaction Amount'] = total_10pin_ret[1]
-    top_10_dist='SELECT TRANS_DIST,SUM(TRANS_AMT) FROM DINESH.MAP_TRANS_DATA GROUP BY TRANS_DIST ORDER BY 2 DESC LIMIT 10'
-    mycursor.execute(top_10_dist)
-    total_10dist_ret= pd.DataFrame(mycursor.fetchall())
-    total_10dist_ret['Transaction District'] = total_10dist_ret[0]
-    total_10dist_ret['Transaction Amount'] = total_10dist_ret[1]
-    st.write('Top 10 Transactions' )
-    st.write('States:',total_10st_ret[['Transaction State','Transaction Amount']] ,'Districts :',total_10dist_ret[['Transaction District','Transaction Amount']],'Postal Codes :',total_10pin_ret[['Transaction Pincode','Transaction Amount']])  
 with col1:
   #based on the dropdown selected the map will be colored
   dropdown = st.selectbox("Select an option", ('Transactions','Users'))
@@ -93,8 +64,41 @@ with col1:
   mycursor.execute(map_user_stsql)
   df_map_user_st = pd.DataFrame(mycursor.fetchall())
   #st.write(df_map_user_st)
-  fig_st = px.pie(df_map_user_st, values=1, names=0, title='State Level User Data')
+  fig_st = px.histogram(df_map_user_st,  x=0,y=1)
   st.plotly_chart(fig_st, use_container_width=True)
+
+with col2:
+  drp2_sql_val=(dropdown2[0],dropdown2[1])
+  #clicking on explore button following details will be shown
+  if st.button("Explore Data"):
+    total_tran='SELECT CASE         WHEN TRANS_AMT >= 10000000 THEN CONCAT(ROUND(TRANS_AMT / 10000000, 2), " Crores")         WHEN TRANS_AMT >= 100000 THEN CONCAT(ROUND(TRANS_AMT / 100000, 2), " Lakhs")         WHEN TRANS_AMT >= 1000 THEN CONCAT(ROUND(TRANS_AMT / 1000, 2), " Thousands")         ELSE CONCAT(TRANS_AMT, " Units")     END AS formatted_amount, CASE         WHEN ATRANS_AMT >= 10000000 THEN CONCAT(ROUND(ATRANS_AMT / 10000000, 2), " Crores")         WHEN ATRANS_AMT >= 100000 THEN CONCAT(ROUND(ATRANS_AMT / 100000, 2), " Lakhs")         WHEN ATRANS_AMT >= 1000 THEN CONCAT(ROUND(ATRANS_AMT / 1000, 2), " Thousands")         ELSE CONCAT(ATRANS_AMT, " Units")     END AS Aformatted_amount FROM(SELECT SUM(TRANS_AMT) AS TRANS_AMT,AVG(TRANS_AMT) AS ATRANS_AMT FROM DINESH.ARR_TRANS_DATA WHERE TRANS_YEAR = %s AND TRANS_QRT = %s) A'
+    mycursor.execute(total_tran,drp2_sql_val)
+    total_ret= mycursor.fetchall()  
+    cat_tran='SELECT TRANS_TYPE,CASE         WHEN TRANS_AMT >= 10000000 THEN CONCAT(ROUND(TRANS_AMT / 10000000, 2), " Crores")         WHEN TRANS_AMT >= 100000 THEN CONCAT(ROUND(TRANS_AMT / 100000, 2), " Lakhs")         WHEN TRANS_AMT >= 1000 THEN CONCAT(ROUND(TRANS_AMT / 1000, 2), " Thousands")         ELSE CONCAT(TRANS_AMT, " Units")     END AS formatted_amount FROM (SELECT TRANS_TYPE,SUM(TRANS_AMT) AS TRANS_AMT FROM DINESH.ARR_TRANS_DATA  WHERE TRANS_YEAR = %s AND TRANS_QRT = %s GROUP BY TRANS_TYPE ORDER BY 2 DESC) A'
+    mycursor.execute(cat_tran,drp2_sql_val)
+    total_cat_ret= pd.DataFrame(mycursor.fetchall())
+    st.write('Total Transactions for Selected Year & Quater:', humanize.intword(total_ret[0][0]),'and Average Transaction :',humanize.intword(total_ret[0][1]))
+    total_cat_ret['Transaction Type'] = total_cat_ret[0]
+    total_cat_ret['Transaction Amount'] = total_cat_ret[1]
+    #total_cat_ret=
+    st.write('Categories:',total_cat_ret[['Transaction Type','Transaction Amount']] )
+    top_10_state='SELECT TRANS_STATE,CASE         WHEN TRANS_AMT >= 10000000 THEN CONCAT(ROUND(TRANS_AMT / 10000000, 2), " Crores")         WHEN TRANS_AMT >= 100000 THEN CONCAT(ROUND(TRANS_AMT / 100000, 2), " Lakhs")         WHEN TRANS_AMT >= 1000 THEN CONCAT(ROUND(TRANS_AMT / 1000, 2), " Thousands")         ELSE CONCAT(TRANS_AMT, " Units")     END AS formatted_amount FROM (SELECT TRANS_STATE,SUM(TRANS_AMT) AS TRANS_AMT FROM DINESH.TOP_TRANS_DATA  WHERE TRANS_YEAR = %s AND TRANS_QRT = %s GROUP BY TRANS_STATE ORDER BY 2 DESC LIMIT 10) A'
+    mycursor.execute(top_10_state,drp2_sql_val)
+    total_10st_ret= pd.DataFrame(mycursor.fetchall())
+    total_10st_ret['Transaction State'] = total_10st_ret[0]
+    total_10st_ret['Transaction Amount'] = total_10st_ret[1]
+    top_10_pin='SELECT TRANS_PIN,CASE         WHEN TRANS_AMT >= 10000000 THEN CONCAT(ROUND(TRANS_AMT / 10000000, 2), " Crores")         WHEN TRANS_AMT >= 100000 THEN CONCAT(ROUND(TRANS_AMT / 100000, 2), " Lakhs")         WHEN TRANS_AMT >= 1000 THEN CONCAT(ROUND(TRANS_AMT / 1000, 2), " Thousands")         ELSE CONCAT(TRANS_AMT, " Units")     END AS formatted_amount FROM (SELECT TRANS_PIN,SUM(TRANS_AMT) AS TRANS_AMT FROM DINESH.TOP_TRANS_DATA  WHERE TRANS_YEAR = %s AND TRANS_QRT = %s GROUP BY TRANS_PIN ORDER BY 2 DESC LIMIT 10) A'
+    mycursor.execute(top_10_pin,drp2_sql_val)
+    total_10pin_ret= pd.DataFrame(mycursor.fetchall())
+    total_10pin_ret['Transaction Pincode'] = total_10pin_ret[0]
+    total_10pin_ret['Transaction Amount'] = total_10pin_ret[1]
+    top_10_dist='SELECT TRANS_DIST,CASE         WHEN TRANS_AMT >= 10000000 THEN CONCAT(ROUND(TRANS_AMT / 10000000, 2), " Crores")         WHEN TRANS_AMT >= 100000 THEN CONCAT(ROUND(TRANS_AMT / 100000, 2), " Lakhs")         WHEN TRANS_AMT >= 1000 THEN CONCAT(ROUND(TRANS_AMT / 1000, 2), " Thousands")         ELSE CONCAT(TRANS_AMT, " Units")     END AS formatted_amount FROM (SELECT TRANS_DIST,SUM(TRANS_AMT) AS TRANS_AMT FROM DINESH.MAP_TRANS_DATA  WHERE TRANS_YEAR = %s AND TRANS_QRT = %s GROUP BY TRANS_DIST ORDER BY 2 DESC LIMIT 10) A'
+    mycursor.execute(top_10_dist,drp2_sql_val)
+    total_10dist_ret= pd.DataFrame(mycursor.fetchall())
+    total_10dist_ret['Transaction District'] = total_10dist_ret[0]
+    total_10dist_ret['Transaction Amount'] = total_10dist_ret[1]
+    st.write('Top 10 Transactions' )
+    st.write('States:',total_10st_ret[['Transaction State','Transaction Amount']] ,'Districts :',total_10dist_ret[['Transaction District','Transaction Amount']],'Postal Codes :',total_10pin_ret[['Transaction Pincode','Transaction Amount']])  
 
 
 
